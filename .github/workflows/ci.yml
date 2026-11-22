@@ -7,8 +7,8 @@ on:
 
 jobs:
   # Builds with the real epoll backend and runs the whole suite on Linux.
-  # This is the job that covers what cannot be verified on the author's
-  # Windows machine (the poll() fallback is exercised locally instead).
+  # This covers what cannot be verified on a Windows-only machine, where the
+  # reactor falls back to a poll() backend.
   test:
     name: linux build + tests
     runs-on: ubuntu-latest
@@ -25,8 +25,8 @@ jobs:
         working-directory: cpp
         run: ./build/kv_tests
 
-  # Reports Linux + epoll throughput.  Numbers from a shared CI runner are
-  # noisy and only meant as a sanity check, not a benchmark result to quote.
+  # Reports Linux + epoll throughput.  A shared CI runner is noisy, so this is
+  # a sanity check, not a number to quote.
   benchmark:
     name: linux epoll benchmark
     runs-on: ubuntu-latest
@@ -40,24 +40,19 @@ jobs:
       - name: build
         run: cmake --build cpp/build -j"$(nproc)"
 
-      - name: start server (2 reactors, SO_REUSEPORT)
+      - name: start server
         working-directory: cpp
         run: |
-          ./build/kvstore --port 9096 --engine hash --threads 2 --shards 64 \
-            > /tmp/kv.log 2>&1 &
-          for _ in $(seq 1 50); do
-            if python3 - <<'PY' 2>/dev/null
-import socket
-socket.create_connection(("127.0.0.1", 9096), timeout=0.2).close()
-PY
-            then
+          ./build/kvstore --port 9096 --engine hash --threads 2 --shards 64 > /tmp/kv.log 2>&1 &
+          for i in $(seq 1 50); do
+            if python3 -c "import socket; socket.create_connection(('127.0.0.1', 9096), 0.5).close()" 2>/dev/null; then
               echo "server is up"
               cat /tmp/kv.log
               exit 0
             fi
             sleep 0.2
           done
-          echo "server failed to start:"
+          echo "server failed to start"
           cat /tmp/kv.log
           exit 1
 
