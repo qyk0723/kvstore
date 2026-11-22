@@ -1,0 +1,73 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Builds with the real epoll backend and runs the whole suite on Linux.
+  # This is the job that covers what cannot be verified on the author's
+  # Windows machine (the poll() fallback is exercised locally instead).
+  test:
+    name: linux build + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: configure
+        run: cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
+
+      - name: build
+        run: cmake --build cpp/build -j"$(nproc)"
+
+      - name: run tests
+        working-directory: cpp
+        run: ./build/kv_tests
+
+  # Reports Linux + epoll throughput.  Numbers from a shared CI runner are
+  # noisy and only meant as a sanity check, not a benchmark result to quote.
+  benchmark:
+    name: linux epoll benchmark
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: configure
+        run: cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
+
+      - name: build
+        run: cmake --build cpp/build -j"$(nproc)"
+
+      - name: start server (2 reactors, SO_REUSEPORT)
+        working-directory: cpp
+        run: |
+          ./build/kvstore --port 9096 --engine hash --threads 2 --shards 64 \
+            > /tmp/kv.log 2>&1 &
+          for _ in $(seq 1 50); do
+            if python3 - <<'PY' 2>/dev/null
+import socket
+socket.create_connection(("127.0.0.1", 9096), timeout=0.2).close()
+PY
+            then
+              echo "server is up"
+              cat /tmp/kv.log
+              exit 0
+            fi
+            sleep 0.2
+          done
+          echo "server failed to start:"
+          cat /tmp/kv.log
+          exit 1
+
+      - name: benchmark
+        working-directory: cpp
+        timeout-minutes: 5
+        run: |
+          ./build/kv_bench --port 9096 --threads 4 --requests 500000 \
+            --pipeline 32 --keys 10000 --get-ratio 0.5
+
+      - name: server log
+        if: always()
+        run: cat /tmp/kv.log

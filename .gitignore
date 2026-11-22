@@ -1,0 +1,22 @@
+# Build artefacts
+build/
+build-*/
+cmake-build-*/
+*.o
+*.obj
+*.exe
+*.pdb
+*.ilk
+
+# Local toolchain used only for off-Linux verification
+.toolchain/
+
+# Runtime data
+*.wal
+kvtests_*.wal
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
