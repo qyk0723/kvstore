@@ -242,6 +242,11 @@ rbtree 的同款写法），既消除了崩溃，也去掉了哨兵的 malloc/fr
 
 > 延迟一栏是"每批耗时 / 批内请求数"，即流水线下的**均摊**服务时间，不是单次 RTT。
 
+> **关于平台差异**：WSL2 的 loopback 要穿过虚拟化层，比原生 Linux 慢很多。同一套代码在
+> GitHub Actions 的 Ubuntu runner（原生 loopback）上，2 Reactor / 64 分片 / 4 连接 / pipeline=32
+> 跑出 **3,297,361 ops/s**（p50 1.0 µs，50 万请求 0 错误，见 CI 的 `linux epoll benchmark` job）。
+> 所以下面所有 WSL2 数字应视为**下界**，而不是这台实现的极限。
+
 ### 9.1 数据结构 × 分片 × Reactor（4 连接、pipeline=32、键空间 1 万）
 
 | 引擎 | 1 Reactor · 1 分片 | 2 Reactor · 1 分片 | 2 Reactor · 64 分片 |
