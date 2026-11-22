@@ -1,5 +1,7 @@
 # kvstore
 
+[![ci](https://github.com/qyk0723/kvstore/actions/workflows/ci.yml/badge.svg)](https://github.com/qyk0723/kvstore/actions/workflows/ci.yml)
+
 一个内存键值存储服务。这个仓库里有两份实现：
 
 | 位置 | 内容 | 说明 |
